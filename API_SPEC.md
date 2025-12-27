@@ -248,23 +248,71 @@ end
 ```ruby
 # app/models/client.rb
 class Client < ApplicationRecord
-  has_many :vehicles, dependent: :destroy
-  has_many :work_orders, dependent: :restrict_with_error
+  # Текущие автомобили клиента
+  has_many :current_vehicles, class_name: 'Vehicle', foreign_key: :current_owner_id
+  
+  # История владения (все автомобили, включая проданные)
+  has_many :vehicle_ownerships, dependent: :destroy
+  has_many :vehicles_ever_owned, through: :vehicle_ownerships, source: :vehicle
+  
+  # Заказы (через автомобили, где клиент был владельцем на момент заказа)
+  has_many :work_orders  # client_id в заказе - кто платит/заказывает
   has_many :calendar_events, dependent: :nullify
   has_many :messages, as: :messageable, dependent: :destroy
+  has_many :notifications, as: :notifiable, dependent: :destroy
+
+  # Тип клиента
+  enum :client_type, {
+    individual: 0,      # Физлицо
+    company: 1,         # Компания
+    dealer: 2           # Дилер/перекуп
+  }, prefix: true
+
+  # Источник привлечения
+  enum :source, {
+    walk_in: 0,         # Пришёл сам
+    referral: 1,        # По рекомендации
+    advertising: 2,     # Реклама
+    repeat: 3,          # Повторный клиент
+    internet: 4,        # Интернет
+    partner: 5          # Партнёр
+  }, prefix: true
 
   validates :name, presence: true, length: { minimum: 2, maximum: 100 }
   validates :phone, presence: true, 
                     uniqueness: { case_sensitive: false },
                     format: { with: /\A\+?[\d\s\-\(\)]+\z/, message: 'неверный формат' }
   validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
+  validates :inn, length: { is: 10 }, allow_blank: true, if: :client_type_company?
+  validates :inn, length: { is: 12 }, allow_blank: true, if: :client_type_individual?
 
   before_validation :normalize_phone
   
-  scope :with_active_orders, -> { joins(:work_orders).where.not(work_orders: { status: 'ready' }).distinct }
+  scope :with_active_orders, -> { 
+    joins(:work_orders).where.not(work_orders: { status: %w[ready cancelled] }).distinct 
+  }
+  scope :with_vehicles, -> { 
+    joins(:current_vehicles).distinct 
+  }
+  scope :vip, -> { where(is_vip: true) }
   scope :search, ->(query) { 
     where('name ILIKE :q OR phone ILIKE :q OR email ILIKE :q', q: "%#{query}%") 
   }
+
+  # Текущие автомобили
+  def vehicles
+    current_vehicles
+  end
+
+  # Все автомобили (текущие + бывшие)
+  def all_vehicles
+    vehicles_ever_owned.distinct
+  end
+
+  # Бывшие автомобили
+  def former_vehicles
+    vehicle_ownerships.ended.includes(:vehicle).map(&:vehicle)
+  end
 
   def active_orders_count
     work_orders.where.not(status: %w[ready cancelled]).count
@@ -274,8 +322,31 @@ class Client < ApplicationRecord
     work_orders.where(status: 'ready').sum(:total_price)
   end
 
+  def orders_count
+    work_orders.count
+  end
+
+  def average_check
+    return 0 if orders_count.zero?
+    (total_spent / work_orders.where(status: 'ready').count).round
+  end
+
+  def last_visit_date
+    work_orders.order(created_at: :desc).first&.created_at&.to_date
+  end
+
+  def days_since_last_visit
+    return nil unless last_visit_date
+    (Date.current - last_visit_date).to_i
+  end
+
   def display_name
     name.presence || phone
+  end
+
+  # Добавить автомобиль клиенту
+  def add_vehicle!(vehicle, source: :unknown, purchase_price: nil, notes: nil)
+    vehicle.assign_owner!(self, source: source, notes: notes)
   end
 
   private
@@ -291,24 +362,52 @@ create_table :clients do |t|
   t.string :phone, null: false
   t.string :email
   t.string :telegram_chat_id
+  t.integer :client_type, default: 0, null: false
+  t.integer :source, default: 0
   t.text :notes
   t.date :birth_date
-  t.integer :source, default: 0  # enum: walk_in, referral, advertising, repeat
+  
+  # Для компаний
+  t.string :company_name
+  t.string :inn
+  t.string :kpp
+  t.string :ogrn
+  t.text :legal_address
+  t.string :contact_person        # Контактное лицо
+  
+  # VIP и скидки
+  t.boolean :is_vip, default: false
+  t.decimal :discount_percent, precision: 5, scale: 2, default: 0
+  
   t.timestamps
 end
 
 add_index :clients, :phone, unique: true
 add_index :clients, :telegram_chat_id, unique: true
 add_index :clients, :email
-add_index :clients, :name, using: :gin, opclass: :gin_trgm_ops  # для быстрого ILIKE поиска
+add_index :clients, :inn
+add_index :clients, :client_type
+add_index :clients, :is_vip
+add_index :clients, :name, using: :gin, opclass: :gin_trgm_ops
 ```
 
-### Vehicle (Автомобиль)
+### Vehicle (Автомобиль) — Самостоятельная сущность
+
+> **Важно:** Автомобиль НЕ привязан жёстко к клиенту. VIN — главный идентификатор.
+> История обслуживания сохраняется при смене владельца.
+> Это стандарт в CDK Global, Reynolds & Reynolds, 1С:Автодилер.
 
 ```ruby
 # app/models/vehicle.rb
 class Vehicle < ApplicationRecord
-  belongs_to :client
+  # Текущий владелец (для быстрого доступа)
+  belongs_to :current_owner, class_name: 'Client', optional: true
+  
+  # История владения
+  has_many :vehicle_ownerships, dependent: :destroy
+  has_many :owners, through: :vehicle_ownerships, source: :client
+  
+  # Заказы привязаны к АВТОМОБИЛЮ, не к клиенту!
   has_many :work_orders, dependent: :restrict_with_error
   has_many :calendar_events, dependent: :nullify
 
@@ -332,9 +431,53 @@ class Vehicle < ApplicationRecord
   before_validation :normalize_gos_number, :normalize_vin
 
   scope :by_brand, ->(brand) { where(brand: brand) }
+  scope :with_owner, -> { where.not(current_owner_id: nil) }
+  scope :without_owner, -> { where(current_owner_id: nil) }  # Например, trade-in
   scope :search, ->(query) { 
     where('brand ILIKE :q OR model ILIKE :q OR gos_number ILIKE :q OR vin ILIKE :q', q: "%#{query}%") 
   }
+
+  # Назначить нового владельца (с историей)
+  def assign_owner!(client, source: nil, purchase_date: nil, notes: nil)
+    transaction do
+      # Закрываем предыдущее владение
+      current_ownership&.update!(ended_at: Time.current)
+      
+      # Создаём новое владение
+      vehicle_ownerships.create!(
+        client: client,
+        started_at: purchase_date || Time.current,
+        source: source,  # 'trade_in', 'purchase', 'gift', 'corporate'
+        notes: notes
+      )
+      
+      # Обновляем текущего владельца
+      update!(current_owner: client)
+    end
+  end
+
+  # Удалить владельца (машина на trade-in или в салоне)
+  def remove_owner!(reason: nil)
+    transaction do
+      current_ownership&.update!(
+        ended_at: Time.current,
+        end_reason: reason  # 'sold', 'trade_in', 'scrapped'
+      )
+      update!(current_owner: nil)
+    end
+  end
+
+  def current_ownership
+    vehicle_ownerships.current.first
+  end
+
+  def ownership_history
+    vehicle_ownerships.includes(:client).order(started_at: :desc)
+  end
+
+  def previous_owners
+    vehicle_ownerships.ended.includes(:client).order(started_at: :desc)
+  end
 
   def full_name
     "#{brand} #{model} (#{year})"
@@ -348,6 +491,20 @@ class Vehicle < ApplicationRecord
     work_orders.where(status: 'ready').order(completed_at: :desc).first&.completed_at&.to_date
   end
 
+  def total_service_cost
+    work_orders.where(status: 'ready').sum(:total_price)
+  end
+
+  def service_count
+    work_orders.count
+  end
+
+  # Полная история обслуживания (для всех владельцев)
+  def full_service_history
+    work_orders.includes(:client, :employee, :services)
+               .order(created_at: :desc)
+  end
+
   private
 
   def normalize_gos_number
@@ -358,6 +515,105 @@ class Vehicle < ApplicationRecord
     self.vin = vin.to_s.upcase.gsub(/[^A-HJ-NPR-Z0-9]/, '') if vin.present?
   end
 end
+
+# db/migrate/xxx_create_vehicles.rb
+create_table :vehicles do |t|
+  t.string :vin, null: true          # VIN - главный идентификатор (может быть пустым для старых авто)
+  t.string :brand, null: false
+  t.string :model, null: false
+  t.integer :year, null: false
+  t.string :gos_number, null: false
+  t.integer :mileage
+  t.string :color
+  t.string :engine_number
+  t.string :body_number
+  t.integer :engine_volume            # объём двигателя в см³
+  t.string :fuel_type                 # petrol, diesel, electric, hybrid
+  t.string :transmission              # manual, automatic, robot, variator
+  t.references :current_owner, foreign_key: { to_table: :clients }
+  t.text :notes
+  t.timestamps
+end
+
+add_index :vehicles, :vin, unique: true
+add_index :vehicles, :gos_number, unique: true
+add_index :vehicles, :current_owner_id
+add_index :vehicles, [:brand, :model]
+```
+
+### VehicleOwnership (История владения автомобилем)
+
+```ruby
+# app/models/vehicle_ownership.rb
+class VehicleOwnership < ApplicationRecord
+  belongs_to :vehicle
+  belongs_to :client
+
+  validates :vehicle, :client, :started_at, presence: true
+  validate :no_overlapping_ownership
+
+  # Источник появления у клиента
+  enum :source, {
+    purchase: 0,        # Покупка
+    trade_in: 1,        # Trade-in (машина была у нас, продана клиенту)
+    gift: 2,            # Подарок
+    inheritance: 3,     # Наследство
+    corporate: 4,       # Корпоративная (компания)
+    leasing: 5,         # Лизинг
+    unknown: 6          # Неизвестно
+  }, prefix: true
+
+  # Причина окончания владения
+  enum :end_reason, {
+    sold: 0,            # Продал
+    trade_in_out: 1,    # Сдал в trade-in
+    scrapped: 2,        # Утилизирована
+    stolen: 3,          # Угнана
+    transferred: 4,     # Передал другому
+    other: 5
+  }, prefix: true
+
+  scope :current, -> { where(ended_at: nil) }
+  scope :ended, -> { where.not(ended_at: nil) }
+  scope :for_client, ->(client_id) { where(client_id: client_id) }
+
+  def active?
+    ended_at.nil?
+  end
+
+  def duration_days
+    end_date = ended_at || Time.current
+    (end_date.to_date - started_at.to_date).to_i
+  end
+
+  private
+
+  def no_overlapping_ownership
+    return if ended_at.present?
+    
+    existing = vehicle.vehicle_ownerships.current.where.not(id: id)
+    if existing.exists?
+      errors.add(:base, 'У автомобиля уже есть активный владелец')
+    end
+  end
+end
+
+# db/migrate/xxx_create_vehicle_ownerships.rb
+create_table :vehicle_ownerships do |t|
+  t.references :vehicle, null: false, foreign_key: true
+  t.references :client, null: false, foreign_key: true
+  t.datetime :started_at, null: false
+  t.datetime :ended_at
+  t.integer :source, default: 0
+  t.integer :end_reason
+  t.decimal :purchase_price, precision: 12, scale: 2
+  t.text :notes
+  t.timestamps
+end
+
+add_index :vehicle_ownerships, [:vehicle_id, :ended_at]
+add_index :vehicle_ownerships, [:client_id, :ended_at]
+add_index :vehicle_ownerships, :started_at
 ```
 
 ### Employee (Сотрудник)
@@ -458,7 +714,9 @@ class WorkOrder < ApplicationRecord
 
   validates :title, presence: true, length: { maximum: 200 }
   validates :client, :vehicle, presence: true
-  validate :vehicle_belongs_to_client
+  # НЕ валидируем принадлежность авто клиенту!
+  # Клиент в заказе = кто платит/заказывает (может быть не владельцем)
+  # Например: жена привезла машину мужа, или корпоративный клиент
   validate :employee_is_active, if: :employee_id_changed?
 
   before_create :generate_order_number
@@ -559,11 +817,6 @@ class WorkOrder < ApplicationRecord
 
   def calculate_total_price
     self.total_price = services.reject(&:marked_for_destruction?).sum { |s| s.price * s.quantity }
-  end
-
-  def vehicle_belongs_to_client
-    return unless vehicle && client
-    errors.add(:vehicle, 'не принадлежит клиенту') unless vehicle.client_id == client_id
   end
 
   def employee_is_active
@@ -1071,6 +1324,212 @@ module Api
 end
 ```
 
+### Vehicles Controller
+
+```ruby
+# app/controllers/api/v1/vehicles_controller.rb
+module Api
+  module V1
+    class VehiclesController < BaseController
+      before_action :set_vehicle, only: [:show, :update, :destroy, :assign_owner, :remove_owner, :service_history, :ownership_history]
+
+      # GET /api/v1/vehicles
+      def index
+        @vehicles = policy_scope(Vehicle)
+                     .includes(:current_owner)
+                     .search(params[:search])
+        
+        @vehicles = @vehicles.by_brand(params[:brand]) if params[:brand].present?
+        @vehicles = @vehicles.with_owner if params[:with_owner] == 'true'
+        @vehicles = @vehicles.without_owner if params[:without_owner] == 'true'
+        
+        @vehicles = @vehicles.order(created_at: :desc).page(params[:page]).per(params[:per_page] || 25)
+
+        render json: {
+          data: VehicleSerializer.new(@vehicles).serializable_hash,
+          meta: pagination_meta(@vehicles)
+        }
+      end
+
+      # GET /api/v1/vehicles/:id
+      def show
+        authorize @vehicle
+        render json: VehicleSerializer.new(@vehicle, 
+          include: [:current_owner, :service_history]
+        ).serializable_hash
+      end
+
+      # POST /api/v1/vehicles
+      # Создание авто БЕЗ владельца (например, trade-in) или С владельцем
+      def create
+        @vehicle = Vehicle.new(vehicle_params.except(:owner_id))
+        authorize @vehicle
+
+        Vehicle.transaction do
+          @vehicle.save!
+          
+          # Если указан владелец — назначаем
+          if params[:vehicle][:owner_id].present?
+            client = Client.find(params[:vehicle][:owner_id])
+            @vehicle.assign_owner!(
+              client, 
+              source: params[:vehicle][:ownership_source],
+              notes: params[:vehicle][:ownership_notes]
+            )
+          end
+        end
+
+        render json: VehicleSerializer.new(@vehicle).serializable_hash, status: :created
+      rescue ActiveRecord::RecordInvalid
+        render json: { errors: @vehicle.errors.full_messages }, status: :unprocessable_entity
+      end
+
+      # PATCH /api/v1/vehicles/:id
+      def update
+        authorize @vehicle
+
+        if @vehicle.update(vehicle_params)
+          render json: VehicleSerializer.new(@vehicle).serializable_hash
+        else
+          render json: { errors: @vehicle.errors.full_messages }, status: :unprocessable_entity
+        end
+      end
+
+      # DELETE /api/v1/vehicles/:id
+      def destroy
+        authorize @vehicle
+        
+        if @vehicle.work_orders.exists?
+          render json: { error: 'Нельзя удалить автомобиль с историей обслуживания' }, status: :unprocessable_entity
+        else
+          @vehicle.destroy
+          head :no_content
+        end
+      end
+
+      # POST /api/v1/vehicles/:id/assign_owner
+      # Назначить нового владельца (с сохранением истории)
+      def assign_owner
+        authorize @vehicle, :update?
+        
+        client = Client.find(params[:client_id])
+        
+        @vehicle.assign_owner!(
+          client,
+          source: params[:source],
+          purchase_date: params[:purchase_date],
+          notes: params[:notes]
+        )
+
+        render json: VehicleSerializer.new(@vehicle.reload).serializable_hash
+      rescue ActiveRecord::RecordNotFound
+        render json: { error: 'Клиент не найден' }, status: :not_found
+      end
+
+      # DELETE /api/v1/vehicles/:id/remove_owner
+      # Убрать владельца (машина на продажу / trade-in)
+      def remove_owner
+        authorize @vehicle, :update?
+        
+        @vehicle.remove_owner!(reason: params[:reason])
+        
+        render json: VehicleSerializer.new(@vehicle.reload).serializable_hash
+      end
+
+      # GET /api/v1/vehicles/:id/service_history
+      # Полная история обслуживания (всех владельцев)
+      def service_history
+        authorize @vehicle, :show?
+        
+        @work_orders = @vehicle.full_service_history
+                               .page(params[:page])
+                               .per(params[:per_page] || 20)
+
+        render json: {
+          data: WorkOrderSerializer.new(@work_orders).serializable_hash,
+          meta: pagination_meta(@work_orders),
+          summary: {
+            total_orders: @vehicle.service_count,
+            total_spent: @vehicle.total_service_cost,
+            last_service: @vehicle.last_service_date
+          }
+        }
+      end
+
+      # GET /api/v1/vehicles/:id/ownership_history
+      # История владения
+      def ownership_history
+        authorize @vehicle, :show?
+        
+        @ownerships = @vehicle.ownership_history
+
+        render json: {
+          current_owner: @vehicle.current_owner ? ClientSerializer.new(@vehicle.current_owner).serializable_hash : nil,
+          ownership_history: @ownerships.map { |o|
+            {
+              id: o.id,
+              client: ClientSerializer.new(o.client).serializable_hash,
+              started_at: o.started_at,
+              ended_at: o.ended_at,
+              source: o.source,
+              end_reason: o.end_reason,
+              duration_days: o.duration_days
+            }
+          }
+        }
+      end
+
+      # GET /api/v1/vehicles/search_by_vin
+      # Поиск по VIN (например, при приёмке — проверить есть ли в базе)
+      def search_by_vin
+        vin = params[:vin].to_s.upcase.gsub(/[^A-HJ-NPR-Z0-9]/, '')
+        
+        @vehicle = Vehicle.find_by(vin: vin)
+        
+        if @vehicle
+          render json: {
+            found: true,
+            vehicle: VehicleSerializer.new(@vehicle, include: [:current_owner]).serializable_hash
+          }
+        else
+          render json: { found: false }
+        end
+      end
+
+      # GET /api/v1/vehicles/search_by_gos_number
+      def search_by_gos_number
+        gos = params[:gos_number].to_s.upcase.gsub(/\s+/, '')
+        
+        @vehicle = Vehicle.find_by(gos_number: gos)
+        
+        if @vehicle
+          render json: {
+            found: true,
+            vehicle: VehicleSerializer.new(@vehicle, include: [:current_owner]).serializable_hash
+          }
+        else
+          render json: { found: false }
+        end
+      end
+
+      private
+
+      def set_vehicle
+        @vehicle = Vehicle.find(params[:id])
+      end
+
+      def vehicle_params
+        params.require(:vehicle).permit(
+          :vin, :brand, :model, :year, :gos_number, :mileage,
+          :color, :engine_number, :body_number, :engine_volume,
+          :fuel_type, :transmission, :notes
+        )
+      end
+    end
+  end
+end
+```
+
 ---
 
 ## Актуальные Gems (2024-2025)
@@ -1342,13 +1801,101 @@ volumes:
 
 ---
 
+## API Routes
+
+```ruby
+# config/routes.rb
+Rails.application.routes.draw do
+  namespace :api do
+    namespace :v1 do
+      # Auth
+      devise_for :users, controllers: {
+        sessions: 'api/v1/sessions',
+        registrations: 'api/v1/registrations'
+      }
+      
+      get 'me', to: 'users#me'
+      patch 'me', to: 'users#update_profile'
+      
+      # Vehicles (отдельная сущность с историей владения)
+      resources :vehicles do
+        member do
+          post :assign_owner      # Назначить владельца
+          delete :remove_owner    # Убрать владельца
+          get :service_history    # История обслуживания
+          get :ownership_history  # История владения
+        end
+        collection do
+          get :search_by_vin
+          get :search_by_gos_number
+        end
+      end
+      
+      # Clients
+      resources :clients do
+        resources :vehicles, only: [:index], controller: 'client_vehicles'
+        resources :work_orders, only: [:index], controller: 'client_work_orders'
+      end
+      
+      # Work Orders
+      resources :work_orders do
+        member do
+          patch :update_status
+        end
+        resources :services, controller: 'work_order_services'
+      end
+      
+      # Employees
+      resources :employees do
+        get :work_orders, on: :member
+      end
+      
+      # Calendar
+      resources :calendar_events
+      
+      # Dashboard
+      namespace :dashboard do
+        get :metrics
+        get :today_schedule
+        get :recent_orders
+      end
+      
+      # Telegram webhook
+      post 'telegram/webhook', to: 'telegram#webhook'
+    end
+  end
+end
+```
+
+---
+
 ## Важные бизнес-правила
 
-1. **Номер заказа** — генерируется автоматически: `ЗН-ГГММ0001` с блокировкой для избежания дублей
-2. **Статусы заказа** — строгий порядок через AASM state machine
-3. **При удалении клиента** — нельзя удалить если есть незавершённые заказы
-4. **При смене статуса** — автоматическое уведомление через Telegram
-5. **Цена заказа** — автоматический пересчёт при изменении услуг
-6. **Только активные сотрудники** могут быть назначены на заказы
-7. **Механики** видят только свои заказы
-8. **История изменений статуса** сохраняется для аудита
+### Автомобили и владение
+
+1. **VIN — главный идентификатор** автомобиля, сохраняется навсегда
+2. **Автомобиль ≠ жёстко привязан к клиенту** — есть current_owner + история владения
+3. **История обслуживания сохраняется** при смене владельца
+4. **Новый владелец видит** всю историю ремонтов машины
+5. **Trade-in:** машина может быть без владельца (в салоне)
+6. **Корпоративные клиенты:** одна машина — разные водители
+
+### Заказы
+
+7. **Клиент в заказе = кто платит**, не обязательно владелец авто
+8. **Номер заказа** — генерируется автоматически: `ЗН-ГГММ0001`
+9. **Статусы заказа** — строгий порядок через AASM state machine
+10. **При смене статуса** — уведомление клиенту и мастеру через Telegram
+11. **Цена заказа** — автоподсчёт из суммы услуг
+
+### Доступ
+
+12. **Механики** видят только свои заказы
+13. **Только активные сотрудники** могут быть назначены
+14. **История изменений статуса** сохраняется для аудита
+
+### Клиенты
+
+15. **Нельзя удалить клиента** с незавершёнными заказами
+16. **VIP-клиенты** — автоматическая скидка
+17. **Физлица и компании** — разные поля (ИНН, КПП для компаний)
