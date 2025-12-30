@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router";
 import Ecommerce from "./pages/Dashboard/Ecommerce";
 import Analytics from "./pages/Dashboard/Analytics";
 import SignIn from "./pages/AuthPages/SignIn";
-import SignUp from "./pages/AuthPages/SignUp";
+// import SignUp from "./pages/AuthPages/SignUp"; // Временно отключено
 import NotFound from "./pages/OtherPage/NotFound";
 import UserProfiles from "./pages/UserProfiles";
 import LineChart from "./pages/Charts/LineChart";
@@ -19,6 +19,7 @@ import Integrations from "./pages/OtherPage/Integrations";
 import Clients from "./pages/Clients";
 import WorkOrdersPage from "./pages/WorkOrders";
 import Employees from "./pages/Employees";
+import ProtectedRoute from "./components/common/ProtectedRoute";
 
 export default function App() {
   return (
@@ -26,41 +27,44 @@ export default function App() {
       <Router>
         <ScrollToTop />
         <Routes>
-          {/* Dashboard Layout */}
-          <Route element={<AppLayout />}>
-            {/* Главная */}
-            <Route index path="/" element={<Ecommerce />} />
-
-            {/* Заказ-наряды */}
-            <Route path="/work-orders" element={<WorkOrdersPage />} />
-            <Route path="/task-kanban" element={<TaskKanban />} />
-
-            {/* Запись на сервис */}
-            <Route path="/calendar" element={<Calendar />} />
-
-            {/* Клиенты и сотрудники */}
-            <Route path="/clients" element={<Clients />} />
-            <Route path="/employees" element={<Employees />} />
-
-            {/* Операции */}
-            <Route path="/file-manager" element={<FileManager />} />
-            <Route path="/transactions" element={<Transactions />} />
-
-            {/* Отчёты */}
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/line-chart" element={<LineChart />} />
-            <Route path="/bar-chart" element={<BarChart />} />
-
-            {/* Прочее */}
-            <Route path="/chat" element={<Chats />} />
-            <Route path="/profile" element={<UserProfiles />} />
-            <Route path="/integrations" element={<Integrations />} />
-          </Route>
-
-          {/* Auth Layout */}
+          {/* Auth Routes (публичные) */}
           <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
+          {/* Регистрация временно отключена - пользователи создаются через бэкенд */}
+          {/* <Route path="/signup" element={<SignUp />} /> */}
           <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* Protected Routes (приватные) */}
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AppLayout />}>
+              {/* Главная */}
+              <Route index path="/" element={<Ecommerce />} />
+
+              {/* Заказ-наряды */}
+              <Route path="/work-orders" element={<WorkOrdersPage />} />
+              <Route path="/task-kanban" element={<TaskKanban />} />
+
+              {/* Запись на сервис */}
+              <Route path="/calendar" element={<Calendar />} />
+
+              {/* Клиенты и сотрудники */}
+              <Route path="/clients" element={<Clients />} />
+              <Route path="/employees" element={<Employees />} />
+
+              {/* Операции */}
+              <Route path="/file-manager" element={<FileManager />} />
+              <Route path="/transactions" element={<Transactions />} />
+
+              {/* Отчёты */}
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/line-chart" element={<LineChart />} />
+              <Route path="/bar-chart" element={<BarChart />} />
+
+              {/* Прочее */}
+              <Route path="/chat" element={<Chats />} />
+              <Route path="/profile" element={<UserProfiles />} />
+              <Route path="/integrations" element={<Integrations />} />
+            </Route>
+          </Route>
 
           {/* Fallback Route */}
           <Route path="*" element={<NotFound />} />

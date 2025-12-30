@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Очистка токенов - Planeta СТО</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .token-status {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .token-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .token-item:last-child {
+            border-bottom: none;
+        }
+        
+        .token-label {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .token-value {
+            font-size: 12px;
+            color: #999;
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-found {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-empty {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 10px 5px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.secondary {
+            background: #6c757d;
+            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.4);
+        }
+        
+        button.secondary:hover {
+            box-shadow: 0 6px 20px rgba(108, 117, 125, 0.6);
+        }
+        
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🔐</div>
+        <h1>Управление токенами</h1>
+        <p class="subtitle">Planeta СТО - Система авторизации</p>
+        
+        <div class="token-status" id="token-status">
+            <div class="token-item">
+                <span class="token-label">localStorage</span>
+                <span class="status-badge" id="local-status">Проверка...</span>
+            </div>
+            <div class="token-item">
+                <span class="token-label">sessionStorage</span>
+                <span class="status-badge" id="session-status">Проверка...</span>
+            </div>
+            <div class="token-item">
+                <span class="token-label">Refresh Token (local)</span>
+                <span class="status-badge" id="refresh-local-status">Проверка...</span>
+            </div>
+            <div class="token-item">
+                <span class="token-label">Refresh Token (session)</span>
+                <span class="status-badge" id="refresh-session-status">Проверка...</span>
+            </div>
+        </div>
+        
+        <div class="success-message" id="success-message">
+            ✅ Все токены успешно удалены!
+        </div>
+        
+        <button onclick="clearAllTokens()">🗑️ Очистить все токены</button>
+        <button class="secondary" onclick="location.reload()">🔄 Обновить</button>
+        
+        <a href="/" class="back-link">← Вернуться к приложению</a>
+    </div>
+
+    <script>
+        function checkTokens() {
+            const localToken = localStorage.getItem('planeta_auth_token');
+            const sessionToken = sessionStorage.getItem('planeta_auth_token');
+            const refreshLocal = localStorage.getItem('planeta_refresh_token');
+            const refreshSession = sessionStorage.getItem('planeta_refresh_token');
+            
+            updateStatus('local-status', localToken);
+            updateStatus('session-status', sessionToken);
+            updateStatus('refresh-local-status', refreshLocal);
+            updateStatus('refresh-session-status', refreshSession);
+        }
+        
+        function updateStatus(elementId, token) {
+            const element = document.getElementById(elementId);
+            if (token) {
+                element.textContent = '✓ Найден';
+                element.className = 'status-badge status-found';
+            } else {
+                element.textContent = '✗ Пусто';
+                element.className = 'status-badge status-empty';
+            }
+        }
+        
+        function clearAllTokens() {
+            // Удаляем все токены
+            localStorage.removeItem('planeta_auth_token');
+            sessionStorage.removeItem('planeta_auth_token');
+            localStorage.removeItem('planeta_refresh_token');
+            sessionStorage.removeItem('planeta_refresh_token');
+            
+            // Показываем сообщение об успехе
+            document.getElementById('success-message').style.display = 'block';
+            
+            // Обновляем статусы
+            checkTokens();
+            
+            // Через 2 секунды предлагаем перейти на страницу входа
+            setTimeout(() => {
+                if (confirm('Токены удалены! Перейти на страницу входа?')) {
+                    window.location.href = '/signin';
+                }
+            }, 1000);
+        }
+        
+        // Проверяем токены при загрузке
+        checkTokens();
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <radialGradient id="plutoGrad" cx="30%" cy="30%">
+      <stop offset="0%" stop-color="#DEB887"/>
+      <stop offset="100%" stop-color="#8B7355"/>
+    </radialGradient>
+  </defs>
+  <circle cx="50" cy="50" r="48" fill="url(#plutoGrad)"/>
+  <path d="M20 50 Q50 30 80 50 Q50 45 20 50" fill="#D2B48C" opacity="0.6"/>
+  <circle cx="45" cy="55" r="15" fill="#C4A76C" opacity="0.4"/>
+  <circle cx="60" cy="40" r="8" fill="#A67B5B" opacity="0.5"/>
+</svg>
+

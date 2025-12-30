@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>🔍 ПРОВЕРКА ВЕРСИИ</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #000;
+            color: #0f0;
+            padding: 50px;
+            font-size: 20px;
+        }
+        .big {
+            font-size: 40px;
+            font-weight: bold;
+            color: #ff0;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>✅ ЕСЛИ ВЫ ВИДИТЕ ЭТОТ ТЕКСТ - ПРАВИЛЬНЫЙ АРХИВ ЗАГРУЖЕН!</h1>
+    
+    <div class="big">
+        ВЕРСИЯ: 30.12.2025 03:35 (FINAL)
+    </div>
+    
+    <p>Файл: CHECK.html</p>
+    <p>Сборка: SECURITY FIX v3</p>
+    <p>JavaScript: index-DPO-LJc3.js</p>
+    
+    <hr>
+    
+    <h2>Теперь откройте главную:</h2>
+    <p><a href="/" style="color: #0ff; font-size: 24px;">https://planeta.marketing/</a></p>
+    
+    <h3>Что должно произойти:</h3>
+    <ul>
+        <li>✅ Автоматический редирект на /signin</li>
+        <li>✅ Страница входа (Email, Password)</li>
+        <li>❌ НЕ должно показывать дашборд!</li>
+    </ul>
+    
+    <hr>
+    
+    <h3>Если показывает дашборд:</h3>
+    <ol>
+        <li>Откройте F12 → Console</li>
+        <li>Напишите: console.log(document.querySelector('script[src*="index"]').src)</li>
+        <li>Должно показать: index-DPO-LJc3.js</li>
+        <li>Если другое имя - загружен СТАРЫЙ файл!</li>
+    </ol>
+    
+    <script>
+        console.log('✅ CHECK.html загружен - правильный архив!');
+        console.log('Версия: 30.12.2025 03:35');
+        console.log('Build: SECURITY FIX v3');
+    </script>
+</body>
+</html>
+

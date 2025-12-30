@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <radialGradient id="saturnGrad" cx="30%" cy="30%">
+      <stop offset="0%" stop-color="#F5DEB3"/>
+      <stop offset="100%" stop-color="#DAA520"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="50" rx="48" ry="12" fill="none" stroke="#C4A35A" stroke-width="6" opacity="0.6" transform="rotate(-20 50 50)"/>
+  <ellipse cx="50" cy="50" rx="42" ry="8" fill="none" stroke="#D4AF37" stroke-width="3" opacity="0.4" transform="rotate(-20 50 50)"/>
+  <circle cx="50" cy="50" r="30" fill="url(#saturnGrad)"/>
+  <ellipse cx="50" cy="42" rx="28" ry="3" fill="#EEE8AA" opacity="0.5"/>
+  <ellipse cx="50" cy="55" rx="28" ry="2" fill="#BDB76B" opacity="0.4"/>
+</svg>
+

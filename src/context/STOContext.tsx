@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import {
   STOStore,
   Client,
@@ -9,7 +9,6 @@ import {
   ChatMessage,
   Notification,
 } from '../types/sto';
-import { initialData } from '../data/initialData';
 
 // Action types
 type Action =
@@ -36,7 +35,7 @@ type Action =
   | { type: 'MARK_NOTIFICATION_READ'; payload: string }
   | { type: 'CLEAR_NOTIFICATIONS' };
 
-const STORAGE_KEY = 'planeta_sto_data';
+// const STORAGE_KEY = 'planeta_sto_data'; // Больше не используется
 
 // Initial state
 const initialState: STOStore = {
@@ -193,30 +192,30 @@ const STOContext = createContext<STOContextType | undefined>(undefined);
 export function STOProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(stoReducer, initialState);
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const data = JSON.parse(saved) as STOStore;
-        dispatch({ type: 'SET_ALL', payload: data });
-      } catch (e) {
-        console.error('Error loading data from localStorage:', e);
-        // Load initial demo data
-        dispatch({ type: 'SET_ALL', payload: initialData });
-      }
-    } else {
-      // First run - load demo data
-      dispatch({ type: 'SET_ALL', payload: initialData });
-    }
-  }, []);
+  // ❌ УБРАНО: НЕ загружаем НИЧЕГО из localStorage!
+  // STOContext больше не используется - все данные через APIContext
+  // localStorage используется ТОЛЬКО для токенов, НЕ для данных!
+  
+  // useEffect(() => {
+  //   const saved = localStorage.getItem(STORAGE_KEY);
+  //   if (saved) {
+  //     try {
+  //       const data = JSON.parse(saved) as STOStore;
+  //       dispatch({ type: 'SET_ALL', payload: data });
+  //     } catch (e) {
+  //       console.error('Error loading data from localStorage:', e);
+  //     }
+  //   }
+  // }, []);
 
-  // Save to localStorage on every change
-  useEffect(() => {
-    if (state.clients.length > 0 || state.workOrders.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }
-  }, [state]);
+  // ❌ УБРАНО: НЕ сохраняем в localStorage!
+  // Все данные должны храниться только на сервере через API
+  
+  // useEffect(() => {
+  //   if (state.clients.length > 0 || state.workOrders.length > 0) {
+  //     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  //   }
+  // }, [state]);
 
   // Helper functions
   const getClient = (id: string) => state.clients.find((c) => c.id === id);

@@ -15,4 +15,15 @@ export default defineConfig({
       },
     }),
   ],
+  server: {
+    port: 3000,
+    proxy: {
+      '/api': {
+        target: 'https://birson.tgapp.online',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path,
+      },
+    },
+  },
 });

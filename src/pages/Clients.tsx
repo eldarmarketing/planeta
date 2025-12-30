@@ -11,15 +11,23 @@ import {
 import Badge from "../components/ui/badge/Badge";
 import { Modal } from "../components/ui/modal";
 import { useModal } from "../hooks/useModal";
-import { useClients, useVehicles } from "../context/STOContext";
-import { Client } from "../types/sto";
+import { useAPI } from "../context/APIContext";
+import { Client as APIClient } from "../services/clientsService";
 import { getPlanetAvatar } from "../utils/planetAvatar";
 
 export default function Clients() {
-  const { clients, addClient, updateClient, deleteClient, getClientVehicles, getClientOrders } = useClients();
-  const { addVehicle, deleteVehicle } = useVehicles();
+  const { 
+    clients, 
+    clientsLoading,
+    createClient, 
+    updateClient, 
+    deleteClient, 
+    getClientVehicles, 
+    getClientOrders 
+  } = useAPI();
+  
   const { isOpen, openModal, closeModal } = useModal();
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [selectedClient, setSelectedClient] = useState<APIClient | null>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -46,7 +54,7 @@ export default function Clients() {
     openModal();
   };
 
-  const handleOpenEdit = (client: Client) => {
+  const handleOpenEdit = (client: APIClient) => {
     setSelectedClient(client);
     setFormData({
       name: client.name,
@@ -57,16 +65,15 @@ export default function Clients() {
     openModal();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (selectedClient) {
-      updateClient({
-        ...selectedClient,
+      await updateClient(selectedClient.id, {
         name: formData.name,
         phone: formData.phone,
         email: formData.email || undefined,
       });
     } else {
-      addClient({
+      await createClient({
         name: formData.name,
         phone: formData.phone,
         email: formData.email || undefined,
@@ -75,37 +82,17 @@ export default function Clients() {
     closeModal();
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (selectedClient) {
-      // Delete associated vehicles
-      const clientVehicles = getClientVehicles(selectedClient.id);
-      clientVehicles.forEach(v => deleteVehicle(v.id));
-      deleteClient(selectedClient.id);
+      await deleteClient(selectedClient.id);
       closeModal();
     }
   };
 
   const handleAddVehicle = () => {
-    if (selectedClient && vehicleData.brand && vehicleData.model && vehicleData.gosNumber) {
-      addVehicle({
-        clientId: selectedClient.id,
-        brand: vehicleData.brand,
-        model: vehicleData.model,
-        year: vehicleData.year,
-        gosNumber: vehicleData.gosNumber,
-        vin: vehicleData.vin || undefined,
-        mileage: vehicleData.mileage || undefined,
-      });
-      setVehicleData({
-        brand: "",
-        model: "",
-        year: new Date().getFullYear(),
-        gosNumber: "",
-        vin: "",
-        mileage: 0,
-      });
-      setShowVehicleForm(false);
-    }
+    // TODO: Implement vehicle creation through API
+    console.warn('Vehicle creation not yet implemented');
+    setShowVehicleForm(false);
   };
 
   const clientVehicles = selectedClient ? getClientVehicles(selectedClient.id) : [];
@@ -117,6 +104,22 @@ export default function Clients() {
         description="Управление клиентами автосервиса"
       />
       <PageBreadcrumb pageTitle="Клиенты" />
+
+      {/* API Status Banner */}
+      <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-900/10 p-4">
+        <div className="flex items-start gap-3">
+          <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="flex-1">
+            <h4 className="text-sm font-medium text-amber-800 dark:text-amber-300">API клиентов в разработке</h4>
+            <p className="text-sm text-amber-700 dark:text-amber-400/80 mt-1">
+              Backend endpoint <code className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 rounded text-xs font-mono">GET /api/v1/clients</code> еще не реализован. 
+              После добавления endpoint на сервере, данные появятся автоматически.
+            </p>
+          </div>
+        </div>
+      </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-5 border-b border-gray-200 dark:border-gray-800">
@@ -161,32 +164,63 @@ export default function Clients() {
               </TableRow>
             </TableHeader>
             <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-              {clients.map((client) => {
-                const clientVehicles = getClientVehicles(client.id);
-                const clientOrders = getClientOrders(client.id);
-                const activeOrders = clientOrders.filter(o => o.status !== 'ready' && o.status !== 'cancelled');
-
-                return (
-                  <TableRow key={client.id}>
-                    <TableCell className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800 p-1.5">
-                          <img
-                            src={getPlanetAvatar(client.name)}
-                            alt={client.name}
-                            className="w-full h-full"
-                          />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-800 dark:text-white/90">
-                            {client.name}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            с {new Date(client.createdAt).toLocaleDateString("ru-RU")}
-                          </p>
-                        </div>
+              {clientsLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="px-5 py-8 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-gray-500 dark:text-gray-400">Загрузка клиентов...</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : clients.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="px-5 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                        <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
                       </div>
-                    </TableCell>
+                      <div>
+                        <p className="text-gray-700 dark:text-gray-300 font-medium">База клиентов пуста</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          API /clients еще не реализован на бэкенде
+                        </p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                          Ожидается endpoint: GET /api/v1/clients
+                        </p>
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                clients.map((client) => {
+                  const clientVehicles = getClientVehicles(client.id);
+                  const clientOrders = getClientOrders(client.id);
+                  const activeOrders = clientOrders.filter(o => o.status !== 'ready' && o.status !== 'cancelled');
+
+                  return (
+                    <TableRow key={client.id}>
+                      <TableCell className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800 p-1.5">
+                            <img
+                              src={getPlanetAvatar(client.name)}
+                              alt={client.name}
+                              className="w-full h-full"
+                            />
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-800 dark:text-white/90">
+                              {client.name}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              с {new Date(client.created_at).toLocaleDateString("ru-RU")}
+                            </p>
+                          </div>
+                        </div>
+                      </TableCell>
                     <TableCell className="px-5 py-4">
                       <div>
                         <p className="text-sm text-gray-700 dark:text-gray-300">{client.phone}</p>
@@ -200,7 +234,7 @@ export default function Clients() {
                         <div className="space-y-1">
                           {clientVehicles.slice(0, 2).map((v) => (
                             <p key={v.id} className="text-sm text-gray-700 dark:text-gray-300">
-                              {v.brand} {v.model} • {v.gosNumber}
+                              {v.brand} {v.model} • {v.gos_number}
                             </p>
                           ))}
                           {clientVehicles.length > 2 && (
@@ -232,8 +266,9 @@ export default function Clients() {
                       </button>
                     </TableCell>
                   </TableRow>
-                );
-              })}
+                  );
+                })
+              )}
             </TableBody>
           </Table>
         </div>
@@ -354,12 +389,13 @@ export default function Clients() {
                     {v.brand} {v.model} ({v.year})
                   </p>
                   <p className="text-xs text-gray-500">
-                    {v.gosNumber} {v.vin && `• VIN: ${v.vin}`}
+                    {v.gos_number} {v.vin && `• VIN: ${v.vin}`}
                   </p>
                 </div>
                 <button
-                  onClick={() => deleteVehicle(v.id)}
+                  onClick={() => console.log('Delete vehicle:', v.id)}
                   className="text-xs text-error-500 hover:text-error-600"
+                  disabled
                 >
                   Удалить
                 </button>

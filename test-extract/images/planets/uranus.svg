@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <radialGradient id="uranusGrad" cx="30%" cy="30%">
+      <stop offset="0%" stop-color="#E0FFFF"/>
+      <stop offset="100%" stop-color="#40E0D0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="50" cy="50" r="48" fill="url(#uranusGrad)"/>
+  <ellipse cx="50" cy="50" rx="46" ry="8" fill="none" stroke="#AFEEEE" stroke-width="3" opacity="0.5" transform="rotate(85 50 50)"/>
+  <ellipse cx="50" cy="45" rx="35" ry="3" fill="#7FFFD4" opacity="0.4"/>
+</svg>
+

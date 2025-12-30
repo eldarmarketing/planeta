@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>🔍 ПРОВЕРКА - planeta.marketing</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #000;
+            color: #0f0;
+            padding: 50px;
+            font-size: 20px;
+        }
+        .big {
+            font-size: 50px;
+            font-weight: bold;
+            color: #ff0;
+            margin: 30px 0;
+            text-align: center;
+        }
+        .success {
+            background: #0a0;
+            color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 30px 0;
+        }
+        h1 { text-align: center; color: #0ff; }
+        ul { font-size: 18px; line-height: 2; }
+        .cmd {
+            background: #222;
+            padding: 15px;
+            border-radius: 5px;
+            color: #ff0;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>✅ УСПЕШНО! ПРАВИЛЬНЫЙ АРХИВ ЗАГРУЖЕН!</h1>
+    
+    <div class="success">
+        <div class="big">ВЕРСИЯ: 30.12.2025 03:40</div>
+        <p>Build: SECURITY FIX v4</p>
+        <p>JavaScript: index-DPO-LJc3.js</p>
+    </div>
+    
+    <hr>
+    
+    <h2 style="color: #ff0;">🎯 ТЕПЕРЬ ПРОВЕРЬТЕ ВХОД:</h2>
+    
+    <p style="font-size: 22px;">
+        Откройте: <a href="/" style="color: #0ff; text-decoration: none; font-weight: bold;">https://planeta.marketing/</a>
+    </p>
+    
+    <h3>✅ Что ДОЛЖНО произойти:</h3>
+    <ul>
+        <li>✅ Автоматический редирект на <strong>/signin</strong></li>
+        <li>✅ Страница входа (Email, Password)</li>
+        <li>✅ Кнопка "Войти"</li>
+        <li>❌ <strong>НЕ</strong> дашборд с данными!</li>
+    </ul>
+    
+    <hr>
+    
+    <h3 style="color: #f00;">❌ Если всё равно показывает дашборд:</h3>
+    
+    <p>Откройте консоль (F12) и выполните:</p>
+    
+    <div class="cmd">
+console.log(document.querySelector('script[src*="index"]').src)
+    </div>
+    
+    <p>Должно показать: <strong style="color: #0ff;">index-DPO-LJc3.js</strong></p>
+    
+    <p>Если другое имя → загружен СТАРЫЙ файл или проблема с кэшем!</p>
+    
+    <h3>Очистите кэш:</h3>
+    
+    <div class="cmd">
+localStorage.removeItem('planeta_sto_data')
+localStorage.removeItem('planeta_auth_token')
+sessionStorage.clear()
+location.reload()
+    </div>
+    
+    <hr>
+    
+    <p style="text-align: center; font-size: 24px; color: #0ff;">
+        <strong>Откройте главную → <a href="/" style="color: #ff0;">planeta.marketing</a></strong>
+    </p>
+    
+    <script>
+        console.log('✅ check.html (маленькими буквами) загружен!');
+        console.log('✅ Версия: 30.12.2025 03:40');
+        console.log('✅ Build: SECURITY FIX v4');
+        console.log('═══════════════════════════════════════');
+        console.log('Теперь откройте главную страницу!');
+        console.log('Должен быть редирект на /signin');
+        console.log('═══════════════════════════════════════');
+    </script>
+</body>
+</html>
