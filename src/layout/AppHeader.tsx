@@ -88,9 +88,11 @@ const AppHeader: React.FC = () => {
           </button>
 
           <Link to="/" className="xl:hidden">
-            <span className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white flex items-center font-outfit uppercase">
-              <span className="logo-dot"></span>planeta
-            </span>
+            <img 
+              src="/images/logo/logo-birson.webp" 
+              alt="Birson Avto" 
+              className="h-8"
+            />
           </Link>
 
           <button

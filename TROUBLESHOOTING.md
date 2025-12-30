@@ -227,3 +227,4 @@ fetch('https://birson.tgapp.online/api/v1/login', {
 Если видите **CORS error** → бэкенд работает, но CORS не настроен.
 Если видите **Failed to fetch** → бэкенд недоступен.
 
+

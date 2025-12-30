@@ -358,13 +358,17 @@ const AppSidebar: React.FC = () => {
       >
         <Link to="/">
           {isExpanded || isHovered || isMobileOpen ? (
-            <span className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-white flex items-center font-outfit uppercase">
-              <span className="logo-dot"></span>planeta
-            </span>
+            <img 
+              src="/images/logo/logo-birson.webp" 
+              alt="Birson Avto" 
+              className="h-8"
+            />
           ) : (
-            <span className="text-[22px] font-semibold text-gray-900 dark:text-white flex items-center font-outfit uppercase">
-              <span className="logo-dot"></span>p
-            </span>
+            <img 
+              src="/images/logo/logo-birson.webp" 
+              alt="Birson" 
+              className="h-8 w-8 object-contain"
+            />
           )}
         </Link>
       </div>
